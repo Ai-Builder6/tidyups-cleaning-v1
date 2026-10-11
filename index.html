@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Suppress Vite HMR WebSocket notices and stub HMR transport in proxied cloud preview
+      (function() {
+        try {
+          var RealWS = window.WebSocket;
+          if (RealWS) {
+            function createMockViteSocket(url, protocols) {
+              var target = new EventTarget();
+              var state = 1; // WebSocket.OPEN
+              var mock = Object.create(RealWS.prototype, {
+                url: { value: String(url || ""), writable: true, configurable: true },
+                protocol: { value: typeof protocols === "string" ? protocols : "vite-hmr", writable: true, configurable: true },
+                readyState: { get: function() { return state; }, configurable: true },
+                bufferedAmount: { value: 0, writable: true, configurable: true },
+                extensions: { value: "", writable: true, configurable: true },
+                binaryType: { value: "blob", writable: true, configurable: true },
+                send: { value: function() {}, writable: true, configurable: true },
+                close: { value: function() { state = 3; }, writable: true, configurable: true },
+                addEventListener: { value: target.addEventListener.bind(target), writable: true, configurable: true },
+                removeEventListener: { value: target.removeEventListener.bind(target), writable: true, configurable: true },
+                dispatchEvent: { value: target.dispatchEvent.bind(target), writable: true, configurable: true }
+              });
+              setTimeout(function() {
+                try {
+                  var evt = new Event("open");
+                  target.dispatchEvent(evt);
+                  if (typeof mock.onopen === "function") mock.onopen(evt);
+                } catch (_) {}
+              }, 0);
+              return mock;
+            }
+
+            function PatchedWebSocket(url, protocols) {
+              var urlStr = String(url || "");
+              var isViteHmr =
+                protocols === "vite-hmr" ||
+                (Array.isArray(protocols) && protocols.indexOf("vite-hmr") !== -1) ||
+                urlStr.indexOf(":24678") !== -1 ||
+                (urlStr.indexOf("token=") !== -1 && urlStr.indexOf("/ws/chat") === -1);
+
+              if (isViteHmr) {
+                return createMockViteSocket(url, protocols);
+              }
+              return new RealWS(url, protocols);
+            }
+
+            PatchedWebSocket.prototype = RealWS.prototype;
+            PatchedWebSocket.CONNECTING = 0;
+            PatchedWebSocket.OPEN = 1;
+            PatchedWebSocket.CLOSING = 2;
+            PatchedWebSocket.CLOSED = 3;
+            window.WebSocket = PatchedWebSocket;
+          }
+
+          var origError = console.error;
+          console.error = function() {
+            var msg = Array.prototype.slice.call(arguments).map(function(a) {
+              return String(a && a.message ? a.message : a || "");
+            }).join(" ");
+            if (msg.indexOf("WebSocket closed without opened") !== -1 || msg.indexOf("[vite] failed to connect to websocket") !== -1) {
+              return;
+            }
+            return origError.apply(console, arguments);
+          };
+
+          window.addEventListener("unhandledrejection", function(event) {
+            if (event && event.reason && String(event.reason.message || event.reason).indexOf("WebSocket closed without opened") !== -1) {
+              event.preventDefault();
+            }
+          });
+
+          window.addEventListener("error", function(event) {
+            if (event && (event.message || "").indexOf("WebSocket closed without opened") !== -1) {
+              event.preventDefault();
+            }
+          });
+        } catch (_) {}
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ec4899" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Dispatch Genie" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <title>Dispatch Genie – Smart Field Service Dispatch &amp; Scheduling</title>
+    <meta name="description" content="Dispatch Genie is the intelligent operations console, live territory dispatch board, route optimization, and Jobber sync platform. Connected to https://dispatchgeeni.com." />
+    <link rel="canonical" href="https://dispatchgeeni.com" />
+    <meta property="og:site_name" content="Dispatch Genie" />
+    <meta property="og:title" content="Dispatch Genie – Smart Field Service Dispatch &amp; Scheduling" />
+    <meta property="og:description" content="Dispatch Genie is the intelligent operations console, live territory dispatch board, route optimization, and Jobber sync platform. Connected to https://dispatchgeeni.com." />
+    <meta property="og:url" content="https://dispatchgeeni.com" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dispatch Genie – Smart Field Service Dispatch &amp; Scheduling" />
+    <meta name="twitter:description" content="Dispatch Genie is the intelligent operations console, live territory dispatch board, route optimization, and Jobber sync platform. Connected to https://dispatchgeeni.com." />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Dispatch Genie",
+      "url": "https://dispatchgeeni.com",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "All",
+      "description": "Dispatch Genie operations console, live field dispatch board, automated booking intake, Edmonton route optimization, and Jobber sync platform.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CAD"
+      }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden select-none">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

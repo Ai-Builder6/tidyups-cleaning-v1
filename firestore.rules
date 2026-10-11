@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Default Deny - Pillar 1: No blanket access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Hardened Global Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Bootstrapped Admin check with fallback to trusted admin collection
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'cleaningserviceyeg@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Path Variable Hardening - ID Poisoning Guard
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Entity Schema Validators
+    // ─────────────────────────────────────────────────────────────────────────
+    function isValidClient(data) {
+      return data.keys().hasAll(['id', 'name', 'phone']) &&
+             data.keys().hasOnly(['id', 'name', 'company', 'email', 'phone', 'secondaryPhone', 'address', 'status', 'tags', 'notes', 'createdAt', 'updatedAt']) &&
+             data.id is string && isValidId(data.id) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30 &&
+             (!('company' in data) || (data.company is string && data.company.size() <= 150)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+             (!('secondaryPhone' in data) || (data.secondaryPhone is string && data.secondaryPhone.size() <= 30)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+             (!('status' in data) || (data.status in ['Client', 'Good lead', 'Bad lead', 'Spam', 'Lead', 'Archived'])) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() <= 20 && (data.tags.size() == 0 || data.tags[0] is string)));
+    }
+
+    function isValidScheduledVisit(data) {
+      return data.keys().hasAll(['id', 'clientName', 'phone', 'address', 'vanId']) &&
+             data.keys().hasOnly(['id', 'jobId', 'clientName', 'phone', 'secondaryPhone', 'address', 'scheduledTime', 'durationMinutes', 'cleanerName', 'vanId', 'hubId', 'status', 'serviceType', 'notes', 'createdAt', 'updatedAt']) &&
+             data.id is string && isValidId(data.id) &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 150 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30 &&
+             data.address is string && data.address.size() <= 300 &&
+             data.vanId is string && data.vanId.size() <= 50 &&
+             (!('secondaryPhone' in data) || (data.secondaryPhone is string && data.secondaryPhone.size() <= 30)) &&
+             (!('jobId' in data) || (data.jobId is string && data.jobId.size() <= 128)) &&
+             (!('scheduledTime' in data) || (data.scheduledTime is string && data.scheduledTime.size() <= 100)) &&
+             (!('durationMinutes' in data) || (data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440)) &&
+             (!('cleanerName' in data) || (data.cleanerName is string && data.cleanerName.size() <= 100)) &&
+             (!('hubId' in data) || (data.hubId is string && data.hubId.size() <= 50)) &&
+             (!('status' in data) || (data.status in ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'Late', 'En Route'])) &&
+             (!('serviceType' in data) || (data.serviceType is string && data.serviceType.size() <= 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidUnscheduledJob(data) {
+      return data.keys().hasAll(['id', 'clientName', 'phone', 'address']) &&
+             data.keys().hasOnly(['id', 'clientName', 'phone', 'address', 'serviceType', 'priority', 'estimatedHours', 'createdAt', 'updatedAt']) &&
+             data.id is string && isValidId(data.id) &&
+             data.clientName is string && data.clientName.size() <= 150 &&
+             data.phone is string && data.phone.size() <= 30 &&
+             data.address is string && data.address.size() <= 300 &&
+             (!('serviceType' in data) || (data.serviceType is string && data.serviceType.size() <= 100)) &&
+             (!('priority' in data) || (data.priority in ['Low', 'Normal', 'High', 'Urgent'])) &&
+             (!('estimatedHours' in data) || (data.estimatedHours is number && data.estimatedHours >= 0 && data.estimatedHours <= 100));
+    }
+
+    function isValidStaff(data) {
+      return data.keys().hasAll(['id', 'name', 'phone']) &&
+             data.keys().hasOnly(['id', 'name', 'role', 'phone', 'email', 'assignedVan', 'hubId', 'color', 'status']) &&
+             data.id is string && isValidId(data.id) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 30 &&
+             (!('role' in data) || (data.role is string && data.role.size() <= 50)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+             (!('assignedVan' in data) || (data.assignedVan is string && data.assignedVan.size() <= 50)) &&
+             (!('hubId' in data) || (data.hubId is string && data.hubId.size() <= 50)) &&
+             (!('color' in data) || (data.color is string && data.color.size() <= 10));
+    }
+
+    function isValidVanOverride(data) {
+      return data.keys().hasAll(['vanId']) &&
+             data.keys().hasOnly(['vanId', 'customVanName', 'cleanerName', 'phone', 'hubId', 'customHubName', 'color', 'updatedAt']) &&
+             data.vanId is string && isValidId(data.vanId) &&
+             (!('customVanName' in data) || (data.customVanName is string && data.customVanName.size() <= 100)) &&
+             (!('cleanerName' in data) || (data.cleanerName is string && data.cleanerName.size() <= 100)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('hubId' in data) || (data.hubId is string && data.hubId.size() <= 50)) &&
+             (!('customHubName' in data) || (data.customHubName is string && data.customHubName.size() <= 100)) &&
+             (!('color' in data) || (data.color is string && data.color.size() <= 20));
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll(['id', 'quoteNumber', 'clientName', 'totalAmount', 'status']) &&
+             data.keys().hasOnly(['id', 'quoteNumber', 'clientName', 'totalAmount', 'status', 'issueDate', 'lineItems', 'createdAt', 'updatedAt']) &&
+             data.id is string && isValidId(data.id) &&
+             data.quoteNumber is string && data.quoteNumber.size() <= 50 &&
+             data.clientName is string && data.clientName.size() <= 150 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['Draft', 'Sent', 'Approved', 'Converted', 'Declined'];
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['id', 'invoiceNumber', 'clientName', 'totalAmount', 'status']) &&
+             data.keys().hasOnly(['id', 'invoiceNumber', 'clientName', 'totalAmount', 'status', 'issueDate', 'dueDate', 'createdAt', 'updatedAt']) &&
+             data.id is string && isValidId(data.id) &&
+             data.invoiceNumber is string && data.invoiceNumber.size() <= 50 &&
+             data.clientName is string && data.clientName.size() <= 150 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['Draft', 'Awaiting Payment', 'Paid', 'Overdue', 'Bad Debt'];
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Collection Match Blocks
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Clients Collection
+    match /clients/{clientId} {
+      allow get: if isVerified() && isValidId(clientId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(clientId) && isValidClient(incoming()) && incoming().id == clientId;
+      allow update: if isVerified() && isValidId(clientId) && isValidClient(incoming()) && incoming().id == existing().id && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'company', 'email', 'phone', 'secondaryPhone', 'address', 'status', 'tags', 'notes', 'updatedAt'])
+      );
+      allow delete: if isAdmin() && isValidId(clientId);
+    }
+
+    // Scheduled Visits Collection
+    match /scheduledVisits/{visitId} {
+      allow get: if isVerified() && isValidId(visitId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(visitId) && isValidScheduledVisit(incoming()) && incoming().id == visitId;
+      allow update: if isVerified() && isValidId(visitId) && isValidScheduledVisit(incoming()) && incoming().id == existing().id && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['clientName', 'phone', 'secondaryPhone', 'address', 'scheduledTime', 'durationMinutes', 'cleanerName', 'vanId', 'hubId', 'status', 'serviceType', 'notes', 'updatedAt'])
+      );
+      allow delete: if isAdmin() && isValidId(visitId);
+    }
+
+    // Unscheduled Jobs Collection
+    match /unscheduledJobs/{jobId} {
+      allow get: if isVerified() && isValidId(jobId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(jobId) && isValidUnscheduledJob(incoming()) && incoming().id == jobId;
+      allow update: if isVerified() && isValidId(jobId) && isValidUnscheduledJob(incoming()) && incoming().id == existing().id && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['clientName', 'phone', 'address', 'serviceType', 'priority', 'estimatedHours', 'updatedAt'])
+      );
+      allow delete: if isAdmin() && isValidId(jobId);
+    }
+
+    // Staff Roster Collection
+    match /staff/{staffId} {
+      allow get: if isVerified() && isValidId(staffId);
+      allow list: if isVerified();
+      allow create: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && incoming().id == staffId;
+      allow update: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && incoming().id == existing().id;
+      allow delete: if isAdmin() && isValidId(staffId);
+    }
+
+    // Van & Hub Overrides Collection
+    match /vanOverrides/{vanId} {
+      allow get: if isVerified() && isValidId(vanId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(vanId) && isValidVanOverride(incoming()) && incoming().vanId == vanId;
+      allow update: if isVerified() && isValidId(vanId) && isValidVanOverride(incoming()) && incoming().vanId == existing().vanId && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['customVanName', 'cleanerName', 'phone', 'hubId', 'customHubName', 'color', 'updatedAt'])
+      );
+      allow delete: if isAdmin() && isValidId(vanId);
+    }
+
+    // Quotes Collection
+    match /quotes/{quoteId} {
+      allow get: if isVerified() && isValidId(quoteId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(quoteId) && isValidQuote(incoming()) && incoming().id == quoteId;
+      allow update: if isVerified() && isValidId(quoteId) && isValidQuote(incoming()) && incoming().id == existing().id;
+      allow delete: if isAdmin() && isValidId(quoteId);
+    }
+
+    // Invoices Collection
+    match /invoices/{invoiceId} {
+      allow get: if isVerified() && isValidId(invoiceId);
+      allow list: if isVerified();
+      allow create: if isVerified() && isValidId(invoiceId) && isValidInvoice(incoming()) && incoming().id == invoiceId;
+      allow update: if isVerified() && isValidId(invoiceId) && isValidInvoice(incoming()) && incoming().id == existing().id;
+      allow delete: if isAdmin() && isValidId(invoiceId);
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow get: if isAdmin() && isValidId(adminId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(adminId);
+      allow update: if isAdmin() && isValidId(adminId);
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+  }
+}

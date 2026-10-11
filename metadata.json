@@ -1,0 +1,11 @@
+{
+  "name": "Cleaning Service Dispatch Board",
+  "description": "Interactive regional territory dispatch board for 2 mobile cleaning vans and 3 core cleaning services (Standard, Deep, Move-Out) with voice dictation booking intake, Edmonton route optimization, and Jobber backend sync.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

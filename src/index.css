@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Book My Cleaning / Tidyups Signature Theme Variables */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Book My Cleaning Palette */
+  --bmc-dark-bg: #0d0a12;
+  --bmc-card-bg: #15101d;
+  --bmc-border: #281d38;
+  --bmc-coral: #FF7B54;
+  --bmc-pink: #ec4899;
+  --bmc-magenta: #ef3ecf;
+  --bmc-purple: #a855f7;
+  --bmc-violet: #8b5cf6;
+}
+
+/* Accessible focus ring indicators for keyboard navigation (WCAG 2.4.7 / 2.4.11) */
+*:focus-visible {
+  outline: 2px solid #ec4899 !important;
+  outline-offset: 2px !important;
+}
+
+/* WebKit Backdrop Filter Fallback Support */
+@supports (-webkit-backdrop-filter: none) or (backdrop-filter: none) {
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+}
+
+/* Motion Sensitivity: Disable rapid animations for users with prefers-reduced-motion (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-spin,
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+
+/* Utility to hide scrollbar while preserving scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Print styles: Ensure that printing from the main window cleanly prints ONLY the manifest modal */
+@media print {
+  /* Hide all background app chrome and map elements */
+  #global-header,
+  #global-footer,
+  #map-section,
+  #panel-board-view,
+  #fleet-sim-bar,
+  #mobile-dispatch-peek-bar,
+  #mobile-sheet-backdrop,
+  #mobile-landscape-backdrop,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset global viewport sizing and scroll locks */
+  html,
+  body,
+  #root,
+  #hvac-dispatch-app {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Daily manifest modal displays as a natural, unconstrained printable document */
+  #daily-manifest-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+  }
+
+  #daily-manifest-modal-container {
+    position: static !important;
+    display: block !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #daily-manifest-printable-content {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .manifest-stop-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
